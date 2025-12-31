@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authorize } from '@/lib/authorize'
-import { hash } from 'bcryptjs'
+import { hashPassword } from '@/lib/auth'
 
-// GET: List all staff users
+/**
+ * GET /api/users
+ * List all staff users with their permissions
+ */
 export async function GET(req: NextRequest) {
-  const authResult = await authorize('MANAGE_STAFF')
-  if (authResult instanceof NextResponse) return authResult
-
   try {
+    const authResult = await authorize()
+    if (authResult instanceof NextResponse) return authResult
+
     const users = await prisma.user.findMany({
       where: { role: 'STAFF' },
       select: {
@@ -16,6 +19,7 @@ export async function GET(req: NextRequest) {
         username: true,
         role: true,
         createdAt: true,
+        updatedAt: true,
         permissions: {
           select: {
             permission: {
@@ -25,60 +29,114 @@ export async function GET(req: NextRequest) {
           }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      take: 1000
     })
 
-    return NextResponse.json(users)
-  } catch (error) {
-    console.error('Error fetching staff:', error)
-    return NextResponse.json({ error: 'Failed to fetch staff' }, { status: 500 })
+    return NextResponse.json(users, { status: 200 })
+  } catch (error: any) {
+    console.error('GET /api/users error:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch users' },
+      { status: 500 }
+    )
   }
 }
 
-// POST: Create new staff user
+/**
+ * POST /api/users
+ * Create a new staff user
+ */
 export async function POST(req: NextRequest) {
-  const authResult = await authorize('MANAGE_STAFF')
-  if (authResult instanceof NextResponse) return authResult
-
   try {
-    const { username, password, permissions } = await req.json()
+    const authResult = await authorize('MANAGE_STAFF')
+    if (authResult instanceof NextResponse) return authResult
 
-    if (!username || !password) {
-      return NextResponse.json({ error: 'Username and password required' }, { status: 400 })
+    let body: any
+    try {
+      body = await req.json()
+    } catch (e) {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      )
     }
 
-    // Check if user exists
-    const existing = await prisma.user.findUnique({ where: { username } })
+    const { username, password, permissions } = body
+
+    // Validate input
+    if (!username || typeof username !== 'string' || username.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Username is required and must be a non-empty string' },
+        { status: 400 }
+      )
+    }
+
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      return NextResponse.json(
+        { error: 'Password is required and must be at least 6 characters' },
+        { status: 400 }
+      )
+    }
+
+    // Check if username already exists
+    const existing = await prisma.user.findUnique({
+      where: { username: username.trim() }
+    })
+
     if (existing) {
-      return NextResponse.json({ error: 'Username already exists' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Username already exists' },
+        { status: 409 }
+      )
     }
+
+    // Hash password
+    const hashedPassword = hashPassword(password)
 
     // Create user
-    const hashedPassword = await hash(password, 10)
     const user = await prisma.user.create({
       data: {
-        username,
+        username: username.trim(),
         password: hashedPassword,
         role: 'STAFF'
+      },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        createdAt: true
       }
     })
 
     // Assign permissions if provided
-    if (permissions && Array.isArray(permissions)) {
+    if (permissions && Array.isArray(permissions) && permissions.length > 0) {
       for (const permissionId of permissions) {
-        await prisma.userPermission.create({
-          data: {
-            userId: user.id,
-            permissionId,
-            granted: true
+        const permIdNum = Number(permissionId)
+        if (!isNaN(permIdNum)) {
+          // Check if permission exists
+          const perm = await prisma.permission.findUnique({
+            where: { id: permIdNum }
+          })
+          if (perm) {
+            await prisma.userPermission.create({
+              data: {
+                userId: user.id,
+                permissionId: permIdNum,
+                granted: true
+              }
+            })
           }
-        })
+        }
       }
     }
 
     return NextResponse.json(user, { status: 201 })
-  } catch (error) {
-    console.error('Error creating staff:', error)
-    return NextResponse.json({ error: 'Failed to create staff' }, { status: 500 })
+  } catch (error: any) {
+    console.error('POST /api/users error:', error)
+    return NextResponse.json(
+      { error: 'Failed to create user' },
+      { status: 500 }
+    )
   }
 }

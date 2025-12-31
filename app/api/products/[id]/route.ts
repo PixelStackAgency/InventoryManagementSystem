@@ -7,6 +7,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await authorize()
+    if (auth instanceof NextResponse) return auth
+
     const { id } = await params
 
     if (!id || typeof id !== 'string' || id.trim().length === 0) {

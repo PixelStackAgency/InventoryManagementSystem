@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authorize } from '@/lib/authorize'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await authorize()
+    if (auth instanceof NextResponse) return auth
+
     const products = await prisma.product.findMany({
       orderBy: { createdAt: 'desc' },
       take: 1000

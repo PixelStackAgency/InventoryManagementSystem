@@ -1,41 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyPassword, signToken, setAuthCookie } from '@/lib/auth'
+import { verifyPassword, signToken } from '@/lib/auth'
 
+/**
+ * POST /api/auth/login
+ * Login with username and password
+ */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    // Validate request
+    if (req.method !== 'POST') {
+      return NextResponse.json(
+        { error: 'Method not allowed' },
+        { status: 405 }
+      )
+    }
+
+    let body: any
+    try {
+      body = await req.json()
+    } catch (e) {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      )
+    }
+
     const { username, password } = body
 
     // Validate input
-    if (!username || typeof username !== 'string') {
+    if (!username || typeof username !== 'string' || username.trim().length === 0) {
       return NextResponse.json(
-        { error: 'Username is required and must be a string' },
+        { error: 'Username is required' },
         { status: 400 }
       )
     }
 
-    if (!password || typeof password !== 'string') {
+    if (!password || typeof password !== 'string' || password.length === 0) {
       return NextResponse.json(
-        { error: 'Password is required and must be a string' },
+        { error: 'Password is required' },
         { status: 400 }
       )
     }
 
-    if (password.length < 1) {
+    if (username.length > 255 || password.length > 1000) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
       )
     }
 
-    // Find user
-    const user = await prisma.user.findUnique({ 
-      where: { username },
-      select: { id: true, username: true, password: true, role: true }
+    // Find user (case-sensitive username)
+    const user = await prisma.user.findUnique({
+      where: { username: username.trim() },
+      select: { 
+        id: true, 
+        username: true, 
+        password: true, 
+        role: true,
+        createdAt: true
+      }
     })
 
     if (!user) {
+      // Don't reveal if user exists
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
@@ -52,13 +80,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Create token
-    const token = signToken({ 
-      id: user.id, 
-      role: user.role, 
-      username: user.username 
+    const token = signToken({
+      id: user.id,
+      role: user.role,
+      username: user.username,
+      iat: Math.floor(Date.now() / 1000)
     })
 
-    // Set secure httpOnly cookie
+    // Create response
     const res = NextResponse.json(
       {
         ok: true,
@@ -71,6 +100,7 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     )
 
+    // Set secure cookie
     res.cookies.set('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -81,7 +111,7 @@ export async function POST(req: NextRequest) {
 
     return res
   } catch (error: any) {
-    console.error('Login error:', error)
+    console.error('Login error:', error.message || error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

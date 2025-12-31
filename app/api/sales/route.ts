@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authorize } from '@/lib/authorize'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await authorize()
+    if (auth instanceof NextResponse) return auth
+
     const sales = await prisma.sale.findMany({
       include: {
         items: true,

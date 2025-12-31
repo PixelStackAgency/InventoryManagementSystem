@@ -110,17 +110,11 @@ export default function LoginPage() {
 
           <div style={{ marginTop: '32px', paddingTop: '24px', borderTop: '1px solid rgba(96, 165, 250, 0.2)' }}>
             <p style={{ fontSize: '13px', color: '#94a3b8', textAlign: 'center', marginBottom: '12px' }}>
-              💡 Demo Accounts:
+              � Secure Authentication
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px' }}>
-              <div style={{ padding: '12px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '8px', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
-                <div style={{ color: '#60a5fa', fontWeight: '600', marginBottom: '4px' }}>Super Admin 👑</div>
-                <div style={{ color: '#cbd5e1', fontSize: '11px' }}>superadmin / superadmin123</div>
-              </div>
-              <div style={{ padding: '12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
-                <div style={{ color: '#60a5fa', fontWeight: '600', marginBottom: '4px' }}>Staff 👤</div>
-                <div style={{ color: '#cbd5e1', fontSize: '11px' }}>staff (if created)</div>
-              </div>
+            <div style={{ fontSize: '12px', color: '#cbd5e1', textAlign: 'center' }}>
+              <p>This application is fully secured with:</p>
+              <p>✓ JWT Authentication • ✓ Role-Based Access • ✓ Encrypted Passwords</p>
             </div>
           </div>
         </div>
